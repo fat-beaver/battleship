@@ -1,5 +1,6 @@
-use nalgebra::{SMatrix, SVector, U32};
+use nalgebra::{SMatrix, SVector, U32, DMatrix};
 use crate::game::{AimingBoard, BOARD_SIZE, Player, SHIP_LENGTHS, TargetBoard};
+use rayon::prelude::*;
 
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -7,7 +8,8 @@ use rand::prelude::*;
 const INITIAL_WEIGHT: u32 = 1000;
 const BASE_WEIGHT: u32 = 10;
 
-// struct to record which actions have been taken with particular inputs, for adjusting weights
+#[derive(Debug, Clone)]
+/// struct to record which actions have been taken with particular inputs, for adjusting weights
 struct Action {
     hits_input: SVector<u32, BOARD_SIZE>,
     misses_input: SVector<u32, BOARD_SIZE>,
@@ -24,10 +26,15 @@ impl Action {
     }
 }
 
+fn possible_shots() -> [usize; BOARD_SIZE] {
+    core::array::from_fn(|i| i)
+}
+
+#[derive(Debug, Clone)]
 pub struct AIPlayer {
     base_weights: SVector<u32, BOARD_SIZE>,
-    hits_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
-    misses_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
+    hits_weights: DMatrix<u32>,
+    misses_weights: DMatrix<u32>,
     possible_shots: [usize; BOARD_SIZE],
     actions: Vec<Action>
 }
@@ -36,8 +43,8 @@ impl AIPlayer {
     pub fn new() -> Self {
         Self {
             base_weights: SVector::repeat(BASE_WEIGHT),
-            hits_weights: SMatrix::repeat(INITIAL_WEIGHT),
-            misses_weights: SMatrix::repeat(INITIAL_WEIGHT),
+            hits_weights: DMatrix::repeat(BOARD_SIZE, BOARD_SIZE, INITIAL_WEIGHT),
+            misses_weights: DMatrix::repeat(BOARD_SIZE, BOARD_SIZE, INITIAL_WEIGHT),
             possible_shots: core::array::from_fn(|i| i),
             actions: vec![]
         }
@@ -62,12 +69,12 @@ impl Player for AIPlayer {
         // add an initial weight to each cell
         let mut shot_weights: SVector<u32, BOARD_SIZE> = self.base_weights.clone();
         // determine weights for each cell based on hits and misses
-        for cell_number in 0..BOARD_SIZE {
-            shot_weights += self.hits_weights.column(cell_number).component_mul(aiming_board.get_hits());
-            shot_weights += self.misses_weights.column(cell_number).component_mul(aiming_board.get_hits());
-        }
+        
+        shot_weights += self.hits_weights.clone() * aiming_board.get_hits();
+        shot_weights += self.misses_weights.clone() * aiming_board.get_misses();
+
         // remove cells which have been shot at already
-        shot_weights = shot_weights.component_mul(aiming_board.get_targetable());
+        shot_weights.component_mul_assign(aiming_board.get_targetable());
         // use weightedIndex to choose a shot to take based on the random weights which have been generated
         let chosen_shot: usize = self.possible_shots[WeightedIndex::new(shot_weights.iter()).unwrap().sample(&mut thread_rng())];
         // record the action taken to use it for adjusting weights later
@@ -77,5 +84,20 @@ impl Player for AIPlayer {
 
     fn game_finish(mut self: &mut AIPlayer, won: bool) {
 
+    }
+
+    fn merge(&mut self, other: &Self) where Self: Sized {
+        self.base_weights += other.base_weights;
+        self.misses_weights += other.misses_weights.clone();
+        self.hits_weights += other.hits_weights.clone();
+        self.base_weights /= 2;
+        self.misses_weights /= 2;
+        self.hits_weights /= 2;
+    }
+
+    fn clone_from(&mut self, other: &Self) where Self: Sized {
+        self.base_weights = other.base_weights;
+        self.misses_weights = other.misses_weights.clone();
+        self.hits_weights = other.hits_weights.clone();
     }
 }

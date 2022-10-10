@@ -1,26 +1,35 @@
-use std::time::Instant;
 use ai_player::AIPlayer;
-use game::BattleshipGame;
+use game::{BattleshipGame, Player};
+use rayon::{prelude::*, iter::Zip};
+use std::{any::Any, sync::atomic::AtomicU32, time::Instant};
 
-mod game;
 mod ai_player;
+mod game;
 
+const PARALLEL_GAMES: usize = 4;
+const EPOCH_SIZE: usize = 1000;
 
 fn main() {
-    let player1 = AIPlayer::new();
-    let player2 = AIPlayer::new();
+    let mut games = Vec::new();
 
-    let mut games_played: u32 = 0;
-    let mut game = BattleshipGame::new(Box::new(player1), Box::new(player2));
+    for _ in 0..PARALLEL_GAMES {
+        games.push(BattleshipGame::new(AIPlayer::new(), AIPlayer::new()));
+    }
 
-    let start_time = Instant::now();
+    let mut epoch = 0;
+
+    let start = Instant::now();
 
     loop {
-        game.run_game();
-        games_played += 1;
-        if games_played % 10 == 0 {
-            println!( "{} games played in {}ms", games_played, Instant::now().duration_since(start_time).as_millis())
+        games.par_iter_mut().for_each(|game| game.run_for(EPOCH_SIZE));
 
-        }
+        games.iter_mut().reduce(|a,b| { a.merge_games(b); a });
+        
+        games.iter_mut().rev().reduce(|a,b| {b.clone_from(a); a});
+
+        let duration = Instant::now().duration_since(start).as_secs_f64();
+
+        println!("done epoch {}, in {}ms, average games/s: {}", epoch, (duration * 1000.0) as u64, (EPOCH_SIZE * (epoch + 1) * PARALLEL_GAMES) as f64 / duration);
+        epoch += 1;
     }
 }

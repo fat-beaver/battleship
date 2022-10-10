@@ -1,4 +1,7 @@
+use std::any::Any;
+
 use nalgebra::SVector;
+use rayon::prelude::*;
 
 pub const BOARD_WIDTH: u32 = 10;
 pub const BOARD_HEIGHT: u32 = 10;
@@ -8,7 +11,7 @@ pub const SHIP_LENGTHS: [u32; 5] = [5, 4, 3, 3, 2];
 
 pub const TOTAL_SHIP_HEALTH: u32 = 17;  // the total of the ship lengths
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AimingBoard {
     hits: SVector<u32, BOARD_SIZE>,
     misses: SVector<u32, BOARD_SIZE>,
@@ -34,6 +37,7 @@ impl AimingBoard {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Ship {
     x_coord: u32,
     y_coord: u32,
@@ -51,6 +55,7 @@ impl Ship {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TargetBoard {
     ships: Vec<Ship>,
     ships_required: Vec<u32>,
@@ -90,23 +95,25 @@ impl TargetBoard {
     }
 }
 
-pub trait Player {
+pub trait Player: Send + Sync {
     fn new_game(&mut self);
     fn place_ships(&mut self) -> TargetBoard;
     fn take_shot(&mut self, aiming_board: &AimingBoard) -> usize;
     fn game_finish(&mut self, won: bool);
+    fn merge(&mut self, other: &Self) where Self: Sized;
+    fn clone_from(&mut self, other: &Self) where Self: Sized;
 }
 
-struct InternalPlayer {
-    player: Box<dyn Player>,
+struct InternalPlayer<T: Player> {
+    player: T,
     hits_left: u32,
     aiming_board: AimingBoard,
     target_board: TargetBoard
 }
 
-impl InternalPlayer {
-    fn new(mut p: Box<dyn Player>) -> Self {
-        Self {
+impl<T: Player> InternalPlayer<T> {
+    fn new(mut p: T) -> Self {
+            Self {
             target_board: p.place_ships(),
             player: p,
             hits_left: TOTAL_SHIP_HEALTH,
@@ -119,51 +126,114 @@ impl InternalPlayer {
         self.hits_left = TOTAL_SHIP_HEALTH;
         self.aiming_board = AimingBoard::new();
     }
+    fn take_shot(&mut self) -> usize {
+        self.player.take_shot(&self.aiming_board)
+    }
 }
 
-pub struct BattleshipGame {
-    players: [InternalPlayer; 2]
+macro_rules! player_access {
+    (ref $fn_name:ident, $field:ident, $ty:ty) => {
+        pub fn $fn_name(&self, idx: usize) -> & $ty {
+            match idx {
+                0 => &self.player_a.$field,
+                1 => &self.player_b.$field,
+                _ => panic!(),
+            }
+        }
+    };
+    (mut $fn_name:ident, $field:ident, $ty:ty) => {
+        pub fn $fn_name(&mut self, idx: usize) -> &mut $ty {
+            match idx {
+                0 => &mut self.player_a.$field,
+                1 => &mut self.player_b.$field,
+                _ => panic!(),
+            }
+        }
+    };
 }
 
-impl BattleshipGame {
-    pub fn new(p1: Box<dyn Player>, p2: Box<dyn Player>) -> BattleshipGame {
+pub struct BattleshipGame<A, B> where A: Player, B: Player {
+    player_a: InternalPlayer<A>,
+    player_b: InternalPlayer<B>,
+    played: usize,
+}
+
+impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
+    pub fn new(p1:A, p2: B) -> BattleshipGame<A, B> {
         Self {
-            players: [InternalPlayer::new(p1), InternalPlayer::new(p2)]
+            player_a: InternalPlayer::new(p1), 
+            player_b: InternalPlayer::new(p2),
+            played: 0,
         }
     }
+
+    player_access!(ref player, player, dyn Player);
+    player_access!(mut player_mut, player, dyn Player);
+    player_access!(ref hits_left, hits_left, u32);
+    player_access!(mut hits_left_mut, hits_left, u32);
+    player_access!(ref aiming_board, aiming_board, AimingBoard);
+    player_access!(mut aiming_board_mut, aiming_board, AimingBoard);
+    player_access!(ref target_board, target_board, TargetBoard);
+    player_access!(mut target_board_mut, target_board, TargetBoard);
+
     pub fn run_game(&mut self) {
-        for player in self.players.iter_mut() {
-            player.reset();
-        }
+        self.player_a.reset();
+        self.player_b.reset();
+
         let mut current_player_id: usize = 0;
         let mut _turns_taken: usize = 0;
 
         // continue running until a player has lost
-        while self.players[0].hits_left > 0 && self.players[1].hits_left > 0 {
+        while self.player_a.hits_left > 0 && self.player_b.hits_left > 0 {
             // increase the counter of turns taken each time player 1 takes their turn
             if current_player_id == 0 {
                 _turns_taken += 1;
             }
             // ask the current player to take a shot with the information in their aiming board
-            let shot_taken: usize = self.players[current_player_id].player.take_shot(&self.players[current_player_id].aiming_board);
-            if self.players[(current_player_id + 1).rem_euclid(2)].target_board.check_hit(shot_taken) {
-                self.players[current_player_id].aiming_board.hits[shot_taken] = 1;
+            let shot_taken: usize = match current_player_id {
+                0 => self.player_a.take_shot(),
+                1 => self.player_b.take_shot(),
+                _ => panic!(),
+            };
+            if self.target_board((current_player_id + 1).rem_euclid(2)).check_hit(shot_taken) {
+                self.aiming_board_mut(current_player_id).hits[shot_taken] = 1;
                 // take one hit away from the player who was hit
-                self.players[(current_player_id + 1).rem_euclid(2)].hits_left -= 1;
+                *self.hits_left_mut((current_player_id + 1).rem_euclid(2)) -= 1;
             } else {
-                self.players[current_player_id].aiming_board.hits[shot_taken] = 0;
+                self.aiming_board_mut(current_player_id).hits[shot_taken] = 0;
             }
-            self.players[current_player_id].aiming_board.targetable[shot_taken] = 0;
+            self.aiming_board_mut(current_player_id).targetable[shot_taken] = 0;
             // switch to the other player
             current_player_id = (current_player_id + 1).rem_euclid(2);
         }
         // inform the players of their victory/loss when the game ends
-        if self.players[0].hits_left == 0 {
-            self.players[0].player.game_finish(false);
-            self.players[1].player.game_finish(true);
+        if self.player_a.hits_left == 0 {
+            self.player_a.player.game_finish(false);
+            self.player_b.player.game_finish(true);
         } else {
-            self.players[0].player.game_finish(true);
-            self.players[1].player.game_finish(false);
+            self.player_a.player.game_finish(true);
+            self.player_b.player.game_finish(false);
         }
+        self.played += 1;
+    }
+
+    pub fn run_for(&mut self, iterations: usize) {
+        for _ in 0..iterations {
+            self.run_game()
+        }
+    }
+
+    pub fn into_players(self) -> (A,B) {
+        (self.player_a.player, self.player_b.player)
+    }
+
+    pub fn merge_games(&mut self, other: &Self) {
+        self.player_a.player.merge(&other.player_a.player);
+        self.player_b.player.merge(&other.player_b.player);
+    }
+
+    pub fn clone_from(&mut self, other: &Self) {
+        self.player_a.player.clone_from(&other.player_a.player);
+        self.player_b.player.clone_from(&other.player_b.player);
     }
 }
