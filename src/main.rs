@@ -12,7 +12,7 @@ const PARALLEL_GAMES: usize = 4;
 const SERIAL_GAMES: usize = 1000;
 
 fn main() {
-    let parallel_games = num_cpus::get() - 1;
+    let parallel_games = 2;
 
     let player1 = AIPlayer::new();
     let player2 = AIPlayer::new();
@@ -39,7 +39,7 @@ fn main() {
         });
     }
     for mut game in rx {
-        games_played += parallel_games * SERIAL_GAMES;
+        games_played += SERIAL_GAMES;
         let duration = Instant::now().duration_since(start_time).as_secs_f64();
         println!("{} games played in {}s, {} per second", games_played, duration, games_played as f64 / duration);
         let tx1 = tx.clone();
