@@ -1,4 +1,4 @@
-use nalgebra::{SVector, DMatrix};
+use nalgebra::{SVector, DMatrix, SMatrix};
 use crate::game::{AimingBoard, BOARD_SIZE, Player, SHIP_LENGTHS, TargetBoard};
 
 use rand::distributions::WeightedIndex;
@@ -28,8 +28,8 @@ impl Action {
 #[derive(Debug, Clone)]
 pub struct AIPlayer {
     base_weights: SVector<u32, BOARD_SIZE>,
-    hits_weights: DMatrix<u32>,
-    misses_weights: DMatrix<u32>,
+    hits_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
+    misses_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
     possible_shots: [usize; BOARD_SIZE],
     actions: Vec<Action>
 }
@@ -38,8 +38,8 @@ impl AIPlayer {
     pub fn new() -> Self {
         Self {
             base_weights: SVector::repeat(BASE_WEIGHT),
-            hits_weights: DMatrix::repeat(BOARD_SIZE, BOARD_SIZE, INITIAL_WEIGHT),
-            misses_weights: DMatrix::repeat(BOARD_SIZE, BOARD_SIZE, INITIAL_WEIGHT),
+            hits_weights: SMatrix::repeat(INITIAL_WEIGHT),
+            misses_weights: SMatrix::repeat(INITIAL_WEIGHT),
             possible_shots: core::array::from_fn(|i| i),
             actions: vec![]
         }
@@ -77,7 +77,7 @@ impl Player for AIPlayer {
         return chosen_shot;
     }
 
-    fn game_finish(mut self: &mut AIPlayer, won: bool) {
+    fn game_finish(&mut self, won: bool) {
 
     }
 

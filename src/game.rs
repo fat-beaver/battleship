@@ -101,6 +101,7 @@ pub trait Player: Send + Sync {
     fn clone_from(&mut self, other: &Self) where Self: Sized;
 }
 
+#[derive(Debug)]
 struct InternalPlayer<T: Player> {
     player: T,
     hits_left: u32,
@@ -149,6 +150,7 @@ macro_rules! player_access {
     };
 }
 
+#[derive(Debug)]
 pub struct BattleshipGame<A, B> where A: Player, B: Player {
     player_a: InternalPlayer<A>,
     player_b: InternalPlayer<B>,
