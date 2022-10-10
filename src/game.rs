@@ -60,7 +60,7 @@ pub struct TargetBoard {
 impl TargetBoard {
     pub fn new() -> Self {
         Self {
-            ships: vec![],
+            ships: Vec::new(),
             ships_required: Vec::from(SHIP_LENGTHS),
             cells_containing_ships: [false; BOARD_SIZE]
         }
@@ -90,14 +90,14 @@ impl TargetBoard {
     }
 }
 
-pub trait Player {
+pub trait Player: Send {
     fn new_game(&mut self);
     fn place_ships(&mut self) -> TargetBoard;
     fn take_shot(&mut self, aiming_board: &AimingBoard) -> usize;
     fn game_finish(&mut self, won: bool);
 }
 
-struct InternalPlayer {
+struct InternalPlayer  {
     player: Box<dyn Player>,
     hits_left: u32,
     aiming_board: AimingBoard,
@@ -164,6 +164,11 @@ impl BattleshipGame {
         } else {
             self.players[0].player.game_finish(true);
             self.players[1].player.game_finish(false);
+        }
+    }
+    pub fn run_multiple(&mut self, count: usize) {
+        for _ in 0..count {
+            Self::run_game(self)
         }
     }
 }

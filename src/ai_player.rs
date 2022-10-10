@@ -8,6 +8,7 @@ const INITIAL_WEIGHT: u32 = 1000;
 const BASE_WEIGHT: u32 = 10;
 
 /// struct to record which actions have been taken with particular inputs, for adjusting weights
+#[derive(Clone)]
 struct Action {
     hits_input: SVector<u32, BOARD_SIZE>,
     misses_input: SVector<u32, BOARD_SIZE>,
@@ -24,35 +25,30 @@ impl Action {
     }
 }
 
+#[derive(Clone)]
 pub struct AIPlayer {
     base_weights: SVector<u32, BOARD_SIZE>,
     hits_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
     misses_weights: SMatrix<u32, BOARD_SIZE, BOARD_SIZE>,
+    possible_shots: [usize; BOARD_SIZE],
     actions: Vec<Action>
 }
 
 impl AIPlayer {
-    const POSSIBLE_SHOTS: [usize; BOARD_SIZE] = {
-        let mut possible_shots= [0; BOARD_SIZE];
-        let i: usize = 0;
-        while i < BOARD_SIZE {
-            possible_shots[i] = i;
-        }
-        possible_shots
-    };
     pub fn new() -> Self {
         Self {
             base_weights: SVector::repeat(BASE_WEIGHT),
             hits_weights: SMatrix::repeat(INITIAL_WEIGHT),
             misses_weights: SMatrix::repeat(INITIAL_WEIGHT),
-            actions: vec![]
+            possible_shots: core::array::from_fn(|i| i),
+            actions: Vec::new()
         }
     }
 }
 
 impl Player for AIPlayer {
     fn new_game(mut self: &mut AIPlayer) {
-        self.actions = vec![]
+        self.actions = Vec::new()
     }
 
     fn place_ships(&mut self) -> TargetBoard {
@@ -75,7 +71,7 @@ impl Player for AIPlayer {
         // remove cells which have been shot at already
         shot_weights = shot_weights.component_mul(aiming_board.get_targetable());
         // use weightedIndex to choose a shot to take based on the random weights which have been generated
-        let chosen_shot: usize = Self::POSSIBLE_SHOTS[WeightedIndex::new(shot_weights.iter()).unwrap().sample(&mut thread_rng())];
+        let chosen_shot: usize = self.possible_shots[WeightedIndex::new(shot_weights.iter()).unwrap().sample(&mut thread_rng())];
         // record the action taken to use it for adjusting weights later
         self.actions.push(Action::new(aiming_board.get_hits().clone(), aiming_board.get_misses().clone(), chosen_shot));
         return chosen_shot;
