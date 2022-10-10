@@ -65,7 +65,7 @@ impl Player for AIPlayer {
         self.actions = vec![]
     }
 
-    fn place_ships(self: AIPlayer) -> TargetBoard {
+    fn place_ships(self: &mut AIPlayer) -> TargetBoard {
         // reset actions because place_ships is called at the start of each game
         let mut target_board: TargetBoard = TargetBoard::new();
         for i in 0..SHIP_LENGTHS.len() {
