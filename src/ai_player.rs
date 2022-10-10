@@ -1,6 +1,5 @@
-use nalgebra::{SMatrix, SVector, U32, DMatrix};
+use nalgebra::{SVector, DMatrix};
 use crate::game::{AimingBoard, BOARD_SIZE, Player, SHIP_LENGTHS, TargetBoard};
-use rayon::prelude::*;
 
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -24,10 +23,6 @@ impl Action {
             shot_taken: shot
         }
     }
-}
-
-fn possible_shots() -> [usize; BOARD_SIZE] {
-    core::array::from_fn(|i| i)
 }
 
 #[derive(Debug, Clone)]

@@ -1,7 +1,4 @@
-use std::any::Any;
-
 use nalgebra::SVector;
-use rayon::prelude::*;
 
 pub const BOARD_WIDTH: u32 = 10;
 pub const BOARD_HEIGHT: u32 = 10;
@@ -221,10 +218,6 @@ impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
         for _ in 0..iterations {
             self.run_game()
         }
-    }
-
-    pub fn into_players(self) -> (A,B) {
-        (self.player_a.player, self.player_b.player)
     }
 
     pub fn merge_games(&mut self, other: &Self) {

@@ -1,7 +1,7 @@
 use ai_player::AIPlayer;
-use game::{BattleshipGame, Player};
-use rayon::{prelude::*, iter::Zip};
-use std::{any::Any, sync::atomic::AtomicU32, time::Instant};
+use game::BattleshipGame;
+use rayon::prelude::*;
+use std::time::Instant;
 
 mod ai_player;
 mod game;
