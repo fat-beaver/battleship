@@ -8,11 +8,10 @@ use game::BattleshipGame;
 mod game;
 mod ai_player;
 
-const PARALLEL_GAMES: usize = 4;
 const SERIAL_GAMES: usize = 1000;
 
 fn main() {
-    let parallel_games = 2;
+    let parallel_games = num_cpus::get() - 1;
 
     let player1 = AIPlayer::new();
     let player2 = AIPlayer::new();
