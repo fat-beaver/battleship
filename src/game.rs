@@ -1,3 +1,5 @@
+use nalgebra::SVector;
+
 pub const BOARD_WIDTH: u32 = 10;
 pub const BOARD_HEIGHT: u32 = 10;
 pub const BOARD_SIZE: usize = (BOARD_WIDTH * BOARD_HEIGHT) as usize;
@@ -8,22 +10,27 @@ pub const TOTAL_SHIP_HEALTH: u32 = 17;  // the total of the ship lengths
 
 #[derive(Clone)]
 pub struct AimingBoard {
-    hits: [bool; BOARD_SIZE],
-    misses: [bool; BOARD_SIZE]
+    hits: SVector<u32, BOARD_SIZE>,
+    misses: SVector<u32, BOARD_SIZE>,
+    targetable: SVector<u32, BOARD_SIZE>
 }
 
 impl AimingBoard {
     fn new() -> Self {
         Self {
-            hits: [false; BOARD_SIZE],
-            misses: [false; BOARD_SIZE]
+            hits: SVector::repeat(0),
+            misses: SVector::repeat(0),
+            targetable: SVector::repeat(1)
         }
     }
-    pub fn get_hits(&self) -> &[bool; BOARD_SIZE] {
+    pub fn get_hits(&self) -> &SVector<u32, BOARD_SIZE> {
         return &self.hits;
     }
-    pub fn get_misses(&self) -> &[bool; BOARD_SIZE] {
+    pub fn get_misses(&self) -> &SVector<u32, BOARD_SIZE> {
         return &self.misses;
+    }
+    pub fn get_targetable(&self) -> &SVector<u32, BOARD_SIZE> {
+        return &self.targetable;
     }
 }
 
@@ -106,41 +113,57 @@ impl InternalPlayer {
             aiming_board: AimingBoard::new()
         }
     }
+    fn reset(&mut self) {
+        self.player.new_game();
+        self.target_board = self.player.place_ships();
+        self.hits_left = TOTAL_SHIP_HEALTH;
+        self.aiming_board = AimingBoard::new();
+    }
 }
 
-pub fn run_game(player1: Box<dyn Player>, player2: Box<dyn Player>) {
-    // create an array to hold the players so they can be alternated between easily
-    let mut players: [InternalPlayer; 2] = [InternalPlayer::new(player1), InternalPlayer::new(player2)];
+pub struct BattleshipGame {
+    players: [InternalPlayer; 2]
+}
 
-    let mut current_player_id: usize = 0;
-    let mut _turns_taken: usize = 0;
-
-    // continue running until a player has lost
-    while players[0].hits_left > 0 && players[1].hits_left > 0 {
-        // increase the counter of turns taken each time player 1 takes their turn
-        if current_player_id == 0 {
-            _turns_taken += 1;
+impl BattleshipGame {
+    pub fn new(p1: Box<dyn Player>, p2: Box<dyn Player>) -> BattleshipGame {
+        Self {
+            players: [InternalPlayer::new(p1), InternalPlayer::new(p2)]
         }
-        // ask the current player to take a shot with the information in their aiming board
-        let shot_taken: usize = players[current_player_id].player.take_shot(&players[current_player_id].aiming_board);
-        if players[(current_player_id + 1).rem_euclid(2)].target_board.check_hit(shot_taken) {
-            players[current_player_id].aiming_board.hits[shot_taken] = true;
-            // take one hit away from the player who was hit
-            players[(current_player_id + 1).rem_euclid(2)].hits_left -= 1;
-        } else {
-            players[current_player_id].aiming_board.hits[shot_taken] = false;
-        }
-        // switch to the other player
-        current_player_id = (current_player_id + 1).rem_euclid(2);
     }
-    // inform the players of their victory/loss when the game ends
-    if players[0].hits_left == 0 {
-        players[0].player.game_finish(false);
-        players[1].player.game_finish(true);
-        print!("player 2 won!")
-    } else {
-        players[0].player.game_finish(true);
-        players[1].player.game_finish(false);
-        print!("player 1 won!")
+    pub fn run_game(&mut self) {
+        for player in self.players.iter_mut() {
+            player.reset();
+        }
+        let mut current_player_id: usize = 0;
+        let mut _turns_taken: usize = 0;
+
+        // continue running until a player has lost
+        while self.players[0].hits_left > 0 && self.players[1].hits_left > 0 {
+            // increase the counter of turns taken each time player 1 takes their turn
+            if current_player_id == 0 {
+                _turns_taken += 1;
+            }
+            // ask the current player to take a shot with the information in their aiming board
+            let shot_taken: usize = self.players[current_player_id].player.take_shot(&self.players[current_player_id].aiming_board);
+            if self.players[(current_player_id + 1).rem_euclid(2)].target_board.check_hit(shot_taken) {
+                self.players[current_player_id].aiming_board.hits[shot_taken] = 1;
+                // take one hit away from the player who was hit
+                self.players[(current_player_id + 1).rem_euclid(2)].hits_left -= 1;
+            } else {
+                self.players[current_player_id].aiming_board.hits[shot_taken] = 0;
+            }
+            self.players[current_player_id].aiming_board.targetable[shot_taken] = 0;
+            // switch to the other player
+            current_player_id = (current_player_id + 1).rem_euclid(2);
+        }
+        // inform the players of their victory/loss when the game ends
+        if self.players[0].hits_left == 0 {
+            self.players[0].player.game_finish(false);
+            self.players[1].player.game_finish(true);
+        } else {
+            self.players[0].player.game_finish(true);
+            self.players[1].player.game_finish(false);
+        }
     }
 }
