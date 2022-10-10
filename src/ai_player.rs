@@ -64,7 +64,7 @@ impl Player for AIPlayer {
         // determine weights for each cell based on hits and misses
         for cell_number in 0..BOARD_SIZE {
             shot_weights += self.hits_weights.column(cell_number).component_mul(aiming_board.get_hits());
-            shot_weights += self.misses_weights.column(cell_number).component_mul(aiming_board.get_hits());
+            shot_weights += self.misses_weights.column(cell_number).component_mul(aiming_board.get_misses());
         }
         // remove cells which have been shot at already
         shot_weights = shot_weights.component_mul(aiming_board.get_targetable());
@@ -75,7 +75,7 @@ impl Player for AIPlayer {
         return chosen_shot;
     }
 
-    fn game_finish(mut self: &mut AIPlayer, won: bool) {
+    fn game_finish(mut self: &mut AIPlayer, _won: bool) {
 
     }
 }
