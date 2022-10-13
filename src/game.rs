@@ -1,4 +1,4 @@
-use nalgebra::SVector;
+use nalgebra::{SMatrix, SVector};
 
 pub const BOARD_WIDTH: u32 = 10;
 pub const BOARD_HEIGHT: u32 = 10;
@@ -10,26 +10,26 @@ pub const TOTAL_SHIP_HEALTH: u32 = 17;  // the total of the ship lengths
 
 #[derive(Clone)]
 pub struct AimingBoard {
-    hits: SVector<u32, BOARD_SIZE>,
-    misses: SVector<u32, BOARD_SIZE>,
-    targetable: SVector<u32, BOARD_SIZE>
+    hits: SMatrix<u32, 1, BOARD_SIZE>,
+    misses: SMatrix<u32, 1, BOARD_SIZE>,
+    targetable: SMatrix<u32, 1, BOARD_SIZE>
 }
 
 impl AimingBoard {
     fn new() -> Self {
         Self {
-            hits: SVector::repeat(0),
-            misses: SVector::repeat(0),
-            targetable: SVector::repeat(1)
+            hits: SMatrix::repeat(0),
+            misses: SMatrix::repeat(0),
+            targetable: SMatrix::repeat(1)
         }
     }
-    pub fn get_hits(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_hits(&self) -> &SMatrix<u32, 1, BOARD_SIZE> {
         return &self.hits;
     }
-    pub fn get_misses(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_misses(&self) -> &SMatrix<u32, 1, BOARD_SIZE> {
         return &self.misses;
     }
-    pub fn get_targetable(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_targetable(&self) -> &SMatrix<u32, 1, BOARD_SIZE> {
         return &self.targetable;
     }
 }
