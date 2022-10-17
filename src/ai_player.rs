@@ -64,14 +64,14 @@ impl Player for AIPlayer {
         // add an initial weight to each cell
         let mut shot_weights: SVector<u32, BOARD_SIZE> = self.base_weights.clone();
         // determine weights for each cell based on hits and misses
-        shot_weights += self.hits_weights * aiming_board.get_hits();
-        shot_weights += self.misses_weights * aiming_board.get_misses();
+        shot_weights += self.hits_weights.clone() * aiming_board.get_hits();
+        shot_weights += self.misses_weights.clone() * aiming_board.get_misses();
         // remove cells which have been shot at already
         shot_weights = shot_weights.component_mul(aiming_board.get_targetable());
         // use weightedIndex to choose a shot to take based on the random weights which have been generated
         let chosen_shot: usize = self.possible_shots[WeightedIndex::new(shot_weights.iter()).unwrap().sample(&mut thread_rng())];
         // record the action taken to use it for adjusting weights later
-        self.actions.push(Action::new(aiming_board.get_hits().clone(), aiming_board.get_misses().clone(), chosen_shot));
+        self.actions.push(Action::new(aiming_board.get_hits().clone(), aiming_board.get_misses().clone(), chosen_shot.clone()));
         return chosen_shot;
     }
 
