@@ -97,16 +97,16 @@ pub trait Player: Send {
     fn game_finish(&mut self, won: bool);
 }
 
-struct InternalPlayer  {
-    player: Box<dyn Player>,
+struct InternalPlayer<T: Player> {
+    player: T,
     hits_left: u32,
     aiming_board: AimingBoard,
     target_board: TargetBoard
 }
 
-impl InternalPlayer {
-    fn new(mut p: Box<dyn Player>) -> Self {
-        Self {
+impl<T: Player> InternalPlayer<T> {
+    fn new(mut p: T) -> Self {
+            Self {
             target_board: p.place_ships(),
             player: p,
             hits_left: TOTAL_SHIP_HEALTH,
@@ -119,53 +119,87 @@ impl InternalPlayer {
         self.hits_left = TOTAL_SHIP_HEALTH;
         self.aiming_board = AimingBoard::new();
     }
+    fn take_shot(&mut self) -> usize {
+        self.player.take_shot(&self.aiming_board)
+    }
 }
 
-pub struct BattleshipGame {
-    players: [InternalPlayer; 2]
+pub struct BattleshipGame<A, B> where A: Player, B: Player {
+    player_a: InternalPlayer<A>,
+    player_b: InternalPlayer<B>,
+    played: usize,
 }
 
-impl BattleshipGame {
-    pub fn new(p1: Box<dyn Player>, p2: Box<dyn Player>) -> BattleshipGame {
+impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
+    pub fn new(p1:A, p2: B) -> BattleshipGame<A, B> {
         Self {
-            players: [InternalPlayer::new(p1), InternalPlayer::new(p2)]
+            player_a: InternalPlayer::new(p1),
+            player_b: InternalPlayer::new(p2),
+            played: 0,
         }
     }
+
     pub fn run_game(&mut self) {
-        for player in self.players.iter_mut() {
-            player.reset();
-        }
+        self.player_a.reset();
+        self.player_b.reset();
+
         let mut current_player_id: usize = 0;
         let mut _turns_taken: usize = 0;
 
         // continue running until a player has lost
-        while self.players[0].hits_left > 0 && self.players[1].hits_left > 0 {
+        while self.player_a.hits_left > 0 && self.player_b.hits_left > 0 {
             // increase the counter of turns taken each time player 1 takes their turn
             if current_player_id == 0 {
                 _turns_taken += 1;
             }
+
             // ask the current player to take a shot with the information in their aiming board
-            let shot_taken: usize = self.players[current_player_id].player.take_shot(&self.players[current_player_id].aiming_board);
-            if self.players[(current_player_id + 1).rem_euclid(2)].target_board.check_hit(shot_taken) {
-                self.players[current_player_id].aiming_board.hits[shot_taken] = 1;
-                // take one hit away from the player who was hit
-                self.players[(current_player_id + 1).rem_euclid(2)].hits_left -= 1;
+            let shot_taken: usize = match current_player_id {
+                0 => self.player_a.take_shot(),
+                1 => self.player_b.take_shot(),
+                _ => panic!(),
+            };
+
+            if match current_player_id {
+                0 => self.player_b.target_board.check_hit(shot_taken),
+                1 => self.player_a.target_board.check_hit(shot_taken),
+                _ => panic!()
+            } {
+                match current_player_id {
+                0 => self.player_a.aiming_board.hits[shot_taken] = 1,
+                1 => self.player_b.aiming_board.hits[shot_taken] = 1,
+                _ => panic!(),
+                };
+                match current_player_id {
+                0 => self.player_b.hits_left -= 1,
+                1 => self.player_a.hits_left -= 1,
+                _ => panic!(),
+                };
             } else {
-                self.players[current_player_id].aiming_board.hits[shot_taken] = 0;
+                match current_player_id {
+                0 => self.player_b.aiming_board.hits[shot_taken] = 1,
+                1 => self.player_a.aiming_board.hits[shot_taken] = 1,
+                _ => panic!(),
+                };
+                match current_player_id {
+                0 => self.player_a.hits_left -= 1,
+                1 => self.player_b.hits_left -= 1,
+                _ => panic!(),
+                };
             }
-            self.players[current_player_id].aiming_board.targetable[shot_taken] = 0;
-            // switch to the other player
-            current_player_id = (current_player_id + 1).rem_euclid(2);
+            current_player_id = (current_player_id + 1) % 2;
         }
         // inform the players of their victory/loss when the game ends
-        if self.players[0].hits_left == 0 {
-            self.players[0].player.game_finish(false);
-            self.players[1].player.game_finish(true);
+        if self.player_a.hits_left == 0 {
+            self.player_a.player.game_finish(false);
+            self.player_b.player.game_finish(true);
         } else {
-            self.players[0].player.game_finish(true);
-            self.players[1].player.game_finish(false);
+            self.player_a.player.game_finish(true);
+            self.player_b.player.game_finish(false);
         }
+        self.played += 1;
     }
+
     pub fn run_multiple(&mut self, count: usize) {
         for _ in 0..count {
             Self::run_game(self)

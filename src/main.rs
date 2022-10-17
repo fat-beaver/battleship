@@ -8,25 +8,21 @@ use game::BattleshipGame;
 mod game;
 mod ai_player;
 
-const SERIAL_GAMES: usize = 1000;
+const SERIAL_GAMES: usize = 1;
 
 fn main() {
     let parallel_games = num_cpus::get() - 1;
-
-    let player1 = AIPlayer::new();
-    let player2 = AIPlayer::new();
 
     let start_time = Instant::now();
 
     let mut games_played: usize = 0;
 
-    let mut games: Vec<BattleshipGame> = vec![];
+    let mut games = Vec::new();
 
     let (tx, rx) = mpsc::channel();
 
-
     for _ in 0..parallel_games {
-        games.push(BattleshipGame::new(Box::new(player1.clone()), Box::new(player2.clone())));
+        games.push(BattleshipGame::new(AIPlayer::new(), AIPlayer::new()));
     }
 
     while !games.is_empty() {
