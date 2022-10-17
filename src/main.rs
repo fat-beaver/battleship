@@ -8,7 +8,7 @@ use game::BattleshipGame;
 mod game;
 mod ai_player;
 
-const SERIAL_GAMES: usize = 1;
+const SERIAL_GAMES: usize = 100;
 
 fn main() {
     let parallel_games = num_cpus::get() - 1;
