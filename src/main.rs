@@ -8,10 +8,11 @@ use game::BattleshipGame;
 mod game;
 mod ai_player;
 
-const SERIAL_GAMES: usize = 100;
+const SERIAL_GAMES: usize = 1000;
+const TO_PLAY: usize = 1000000000;
 
 fn main() {
-    let parallel_games = num_cpus::get() - 1;
+    let parallel_games = 7;
 
     let start_time = Instant::now();
 
@@ -37,6 +38,9 @@ fn main() {
         games_played += SERIAL_GAMES;
         let duration = Instant::now().duration_since(start_time).as_secs_f64();
         println!("{} games played in {}s, {} per second", games_played, duration, games_played as f64 / duration);
+        if games_played >= TO_PLAY {
+            break;
+        }
         let tx1 = tx.clone();
         thread::spawn(move || {
             game.run_multiple(SERIAL_GAMES);

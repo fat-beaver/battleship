@@ -1,4 +1,4 @@
-use nalgebra::{SMatrix, SVector};
+use nalgebra::{SVector};
 
 pub const BOARD_WIDTH: u32 = 10;
 pub const BOARD_HEIGHT: u32 = 10;
@@ -10,26 +10,26 @@ pub const TOTAL_SHIP_HEALTH: u32 = 17;  // the total of the ship lengths
 
 #[derive(Clone)]
 pub struct AimingBoard {
-    hits: SVector<u32, BOARD_SIZE>,
-    misses: SVector<u32, BOARD_SIZE>,
-    targetable: SVector<u32, BOARD_SIZE>
+    hits: SVector<f64, BOARD_SIZE>,
+    misses: SVector<f64, BOARD_SIZE>,
+    targetable: SVector<f64, BOARD_SIZE>
 }
 
 impl AimingBoard {
     fn new() -> Self {
         Self {
-            hits: SMatrix::repeat(0),
-            misses: SMatrix::repeat(0),
-            targetable: SMatrix::repeat(1)
+            hits: SVector::repeat(0.0),
+            misses: SVector::repeat(0.0),
+            targetable: SVector::repeat(1.0)
         }
     }
-    pub fn get_hits(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_hits(&self) -> &SVector<f64, BOARD_SIZE> {
         return &self.hits;
     }
-    pub fn get_misses(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_misses(&self) -> &SVector<f64, BOARD_SIZE> {
         return &self.misses;
     }
-    pub fn get_targetable(&self) -> &SVector<u32, BOARD_SIZE> {
+    pub fn get_targetable(&self) -> &SVector<f64, BOARD_SIZE> {
         return &self.targetable;
     }
 }
@@ -128,6 +128,7 @@ pub struct BattleshipGame<A, B> where A: Player, B: Player {
     player_a: InternalPlayer<A>,
     player_b: InternalPlayer<B>,
     played: usize,
+    turns_taken: Vec<usize>
 }
 
 impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
@@ -136,6 +137,7 @@ impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
             player_a: InternalPlayer::new(p1),
             player_b: InternalPlayer::new(p2),
             played: 0,
+            turns_taken: Vec::new()
         }
     }
 
@@ -144,13 +146,13 @@ impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
         self.player_b.reset();
 
         let mut current_player_id: usize = 0;
-        let mut _turns_taken: usize = 0;
+        let mut turns_taken: usize = 0;
 
         // continue running until a player has lost
         while self.player_a.hits_left > 0 && self.player_b.hits_left > 0 {
             // increase the counter of turns taken each time player 1 takes their turn
             if current_player_id == 0 {
-                _turns_taken += 1;
+                turns_taken += 1;
             }
 
             // ask the current player to take a shot with the information in their aiming board
@@ -166,24 +168,13 @@ impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
                 _ => panic!()
             } {
                 match current_player_id {
-                0 => self.player_a.aiming_board.hits[shot_taken] = 1,
-                1 => self.player_b.aiming_board.hits[shot_taken] = 1,
+                0 => self.player_a.aiming_board.hits[shot_taken] = 1.0,
+                1 => self.player_b.aiming_board.hits[shot_taken] = 1.0,
                 _ => panic!(),
                 };
                 match current_player_id {
                 0 => self.player_b.hits_left -= 1,
                 1 => self.player_a.hits_left -= 1,
-                _ => panic!(),
-                };
-            } else {
-                match current_player_id {
-                0 => self.player_b.aiming_board.hits[shot_taken] = 1,
-                1 => self.player_a.aiming_board.hits[shot_taken] = 1,
-                _ => panic!(),
-                };
-                match current_player_id {
-                0 => self.player_a.hits_left -= 1,
-                1 => self.player_b.hits_left -= 1,
                 _ => panic!(),
                 };
             }
@@ -198,11 +189,19 @@ impl<A, B> BattleshipGame<A, B> where A: Player, B: Player {
             self.player_b.player.game_finish(false);
         }
         self.played += 1;
+        self.turns_taken.push(turns_taken);
     }
 
     pub fn run_multiple(&mut self, count: usize) {
         for _ in 0..count {
             Self::run_game(self)
         }
+        let mut total = 0;
+        let mut count = 0;
+        for i in self.turns_taken.iter() {
+            total += *i;
+            count += 1;
+        }
+        println!("{} turns taken on average", total / count)
     }
 }
