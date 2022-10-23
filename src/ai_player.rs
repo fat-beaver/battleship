@@ -1,4 +1,4 @@
-use nalgebra::{RowVector, SMatrix, SVector};
+use nalgebra::{SMatrix, SVector};
 use crate::game::{AimingBoard, BOARD_SIZE, Player, SHIP_LENGTHS, TargetBoard};
 
 use rand::distributions::WeightedIndex;
